@@ -1,4 +1,13 @@
 #! /bin/bash 
+
+## Default values in this script - doesnt work with multiple ip
+#CUSTOM_HOSTNAME=`hostname -f`
+#CUSTOM_IP=`hostname -I | tr -d '[:space:]'`
+
+# Custom values
+CUSTOM_HOSTNAME=localhost.localdomain
+CUSTOM_IP=127.0.0.1
+
 echo "-- Configure and optimize the OS"
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
 echo never > /sys/kernel/mm/transparent_hugepage/defrag
@@ -42,8 +51,18 @@ case "$1" in
             ;;
         gcp)
             ;;
+        ibmcloud)
+# default root disk in most IBM Cloud Centos images is often small so second disk may be needed for /opt
+# if you are already using /opt before the CDH install you may need to adjust this step as appropriate
+# additionally, /opt/ already has some contents related with ibmcloud itself
+#            umount /mnt/resource
+            mount /dev/xvdc /mnt/ext
+            mkdir -p /mnt/ext/cloudera
+            rm -f /opt/cloudera
+            ln -sf /mnt/ext/cloudera /opt/cloudera
+            ;;
         *)
-            echo $"Usage: $0 {aws|azure|gcp} template-file [docker-device]"
+            echo $"Usage: $0 {aws|azure|gcp|ibmcloud} template-file [docker-device]"
             echo $"example: ./setup.sh azure templates/essential.json"
             echo $"example: ./setup.sh aws template/cml.json /dev/xvdb"
             exit 1
@@ -54,9 +73,13 @@ DOCKERDEVICE=$3
 
 echo "-- Configure networking"
 PUBLIC_IP=`curl https://api.ipify.org/`
-hostnamectl set-hostname `hostname -f`
-echo "`hostname -I` `hostname`" >> /etc/hosts
-sed -i "s/HOSTNAME=.*/HOSTNAME=`hostname`/" /etc/sysconfig/network
+
+if [ "$CUSTOM_HOSTNAME" != 'localhost.localdomain' ]; then
+  hostnamectl set-hostname `hostname -f`
+  echo "`hostname -I` `hostname`" >> /etc/hosts
+  sed -i "s/HOSTNAME=.*/HOSTNAME=`hostname`/" /etc/sysconfig/network
+fi
+
 systemctl disable firewalld
 systemctl stop firewalld
 setenforce 0
@@ -192,8 +215,8 @@ rm -f /opt/cloudera/cem/efm/conf/efm.properties
 cp conf/efm.properties /opt/cloudera/cem/efm/conf
 rm -f /opt/cloudera/cem/minifi/conf/bootstrap.conf
 cp conf/bootstrap.conf /opt/cloudera/cem/minifi/conf
-sed -i "s/YourHostname/`hostname -f`/g" /opt/cloudera/cem/efm/conf/efm.properties
-sed -i "s/YourHostname/`hostname -f`/g" /opt/cloudera/cem/minifi/conf/bootstrap.conf
+sed -i "s/YourHostname/$CUSTOM_HOSTNAME/g" /opt/cloudera/cem/efm/conf/efm.properties
+sed -i "s/YourHostname/$CUSTOM_HOSTNAME/g" /opt/cloudera/cem/minifi/conf/bootstrap.conf
 /opt/cloudera/cem/minifi/bin/minifi.sh install
 
 
@@ -202,7 +225,7 @@ ssh-keygen -f ~/myRSAkey -t rsa -N ""
 mkdir ~/.ssh
 cat ~/myRSAkey.pub >> ~/.ssh/authorized_keys
 chmod 400 ~/.ssh/authorized_keys
-ssh-keyscan -H `hostname` >> ~/.ssh/known_hosts
+ssh-keyscan -H $CUSTOM_HOSTNAME >> ~/.ssh/known_hosts
 sed -i 's/.*PermitRootLogin.*/PermitRootLogin without-password/' /etc/ssh/sshd_config
 systemctl restart sshd
 
@@ -219,12 +242,12 @@ echo "-- Now CM is started and the next step is to automate using the CM API"
 
 pip install --upgrade pip cm_client
 
-sed -i "s/YourHostname/`hostname -f`/g" $TEMPLATE
+sed -i "s/YourHostname/$CUSTOM_HOSTNAME/g" $TEMPLATE
 sed -i "s/YourCDSWDomain/cdsw.$PUBLIC_IP.nip.io/g" $TEMPLATE
-sed -i "s/YourPrivateIP/`hostname -I | tr -d '[:space:]'`/g" $TEMPLATE
+sed -i "s/YourPrivateIP/$PUBLIC_IP/g" $TEMPLATE
 sed -i "s#YourDockerDevice#$DOCKERDEVICE#g" $TEMPLATE
 
-sed -i "s/YourHostname/`hostname -f`/g" scripts/create_cluster_krb.py
+sed -i "s/YourHostname/$CUSTOM_HOSTNAME/g" scripts/create_cluster_krb.py
 
 python scripts/create_cluster_krb.py $TEMPLATE
 
