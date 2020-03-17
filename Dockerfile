@@ -13,4 +13,6 @@ rm -f /lib/systemd/system/anaconda.target.wants/*;
 
 # Install anything. The service you want to start must be a SystemD service.
 
+##### CDP7 install starts here
+
 CMD ["/usr/sbin/init"]

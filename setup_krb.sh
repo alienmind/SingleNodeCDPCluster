@@ -5,8 +5,15 @@
 #CUSTOM_IP=`hostname -I | tr -d '[:space:]'`
 
 # Custom values
-CUSTOM_HOSTNAME=localhost.localdomain
-CUSTOM_IP=127.0.0.1
+CUSTOM_HOSTNAME=cdp7
+CUSTOM_IP=`getent host cdp7 | cut -d" " -f1`
+
+#####
+yum install dnsutils bind-utils
+# Base users
+useradd centos
+useradd hdfs
+
 
 echo "-- Configure and optimize the OS"
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
@@ -51,18 +58,10 @@ case "$1" in
             ;;
         gcp)
             ;;
-        ibmcloud)
-# default root disk in most IBM Cloud Centos images is often small so second disk may be needed for /opt
-# if you are already using /opt before the CDH install you may need to adjust this step as appropriate
-# additionally, /opt/ already has some contents related with ibmcloud itself
-#            umount /mnt/resource
-            mount /dev/xvdc /mnt/ext
-            mkdir -p /mnt/ext/cloudera
-            rm -f /opt/cloudera
-            ln -sf /mnt/ext/cloudera /opt/cloudera
+        docker)
             ;;
         *)
-            echo $"Usage: $0 {aws|azure|gcp|ibmcloud} template-file [docker-device]"
+            echo $"Usage: $0 {aws|azure|gcp|docker} template-file [docker-device]"
             echo $"example: ./setup.sh azure templates/essential.json"
             echo $"example: ./setup.sh aws template/cml.json /dev/xvdb"
             exit 1
