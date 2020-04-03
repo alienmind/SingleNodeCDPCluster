@@ -226,7 +226,7 @@ sed -i "s#YourDockerDevice#$DOCKERDEVICE#g" $TEMPLATE
 
 sed -i "s/YourHostname/`hostname -f`/g" scripts/create_cluster.py
 
-python scripts/create_cluster.py $TEMPLATE
+#python scripts/create_cluster.py $TEMPLATE
 
 # configure and start EFM and Minifi
 service efm start
